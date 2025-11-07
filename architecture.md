@@ -12,6 +12,7 @@
 ##  WebSocket Protocol
 
 | Event Type | Data Structure | Description |
+
 | **draw** | `{ type: draw, from, to, tool, color, width, userId }` | Triggered for every drawing action |
 | **cursor** | `{ type: cursor, x, y, userId }` | Tracks real-time cursor movement |
 | **undo** | `{ type: undo, userId }` | Removes the latest action from global history |
