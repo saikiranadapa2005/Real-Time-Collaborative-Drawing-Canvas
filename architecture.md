@@ -1,46 +1,47 @@
-# Architecture Overview
+#  Architecture Overview
 
-## Data Flow Diagram
+##  Data Flow
 
-(User’s mouse input)
-|
-V
-[Frontend Canvas]
-|
-V
-WebSocket Event → [Node.js Server] → Broadcast → [All Connected Clients]
+**User Input → Frontend Canvas → WebSocket → Node.js Server → Broadcast → All Clients**
+
+- Each user sends drawing, cursor, and undo/redo events via WebSocket.  
+- The server maintains a global operation history, serializes updates, and broadcasts them to keep all clients’ canvases synchronized.
 
 
-- Each user sends drawing operations, cursor movements, and undo/redo actions to the server via WebSocket.
-- Server serializes operations, manages global history, broadcasts to all users.
 
-## WebSocket Protocol
+##  WebSocket Protocol
 
-- **draw**: `{ type: "draw", from, to, tool, color, width, userId }` — Broadcast on every drawing action
-- **cursor**: `{ type: "cursor", x, y, userId }` — Broadcast on mouse movement
-- **undo**: `{ type: "undo", userId }` — Triggers undo in global history
-- **redo**: `{ type: "redo", userId }` — Triggers redo in global history
-- **userlist**: `{ users: [{id, color}] }` — Broadcast when users connect/disconnect
+| Event Type | Data Structure | Description |
+| **draw** | `{ type: draw, from, to, tool, color, width, userId }` | Triggered for every drawing action |
+| **cursor** | `{ type: cursor, x, y, userId }` | Tracks real-time cursor movement |
+| **undo** | `{ type: undo, userId }` | Removes the latest action from global history |
+| **redo** | `{ type: redo, userId }` | Restores the most recently undone action |
+| **userlist** | `{ users: [{ id, color }] }` | Updates connected users and their assigned colors |
 
-## Undo/Redo Strategy
 
-- **Global operation history**:  
-  All drawing actions are stored in a central array (`history[]`). Undo/redo removes/restores the last action regardless of which user performed it.
-- **Conflict resolution**:  
-  If user A undoes user B’s last action, it is removed from the canvas for all. Redo restores the most recently “undone” action.
-- **Canvas state consistency:**  
-  After undo/redo, the server broadcasts updated operation history which every client uses to re-render the canvas.
 
-## Performance Decisions
+##  Undo/Redo Mechanism
 
-- Minimal redraws: Only the affected operations are computed after undo/redo.
-- Drawing data is serialized into compact objects (coordinates normalized to canvas size).
-- Cursors and user info are lightweight, optimized for low-latency updates.
-- No additional drawing libraries—pure Canvas API for efficiency and maximum control.
+- **Centralized History:** All drawing actions are stored in a shared array (`history[]`).  
+- **Global Scope:** Undo/redo affects the most recent operation, regardless of who performed it.  
+- **Re-rendering:** After an undo/redo, the server broadcasts the updated history, prompting all clients to redraw.  
+- **Consistency:** Only one operation is undone/redone at a time, ensuring identical canvas states for all users.
 
-## Conflict Resolution
 
-- All operations are linearized in the server’s history; simultaneous events are ordered as they arrive.
-- Each action is tagged with user ID and processed sequentially.
-- Undo/redo applies to the top of the history stack, preventing partial/inconsistent undos.
-- If simultaneous drawings overlap, all strokes are rendered in server-received order for all users.
+
+##  Performance Optimizations
+
+- **Minimal Redraws:** Only affected operations are recomputed during undo/redo.  
+- **Compact Serialization:** Coordinate data normalized and stored efficiently.  
+- **Low Latency:** Cursor and user events use lightweight payloads.  
+- **Pure Canvas API:** No external libraries — ensures smooth rendering and maximum control.
+
+
+##  Conflict Resolution
+
+- Operations are ordered sequentially as received by the server.  
+- Each action includes a user ID for proper tracking and conflict handling.  
+- Undo/redo applies only to the top of the history stack to avoid partial rollbacks.  
+- Overlapping drawings are rendered in server-received order, guaranteeing consistent visuals for all users.
+
+
